@@ -57,6 +57,16 @@ Follow these instructions to set up and run benchmarks on your system.
 
 ### Installation
 
+#### Using pip
+
+Install the package directly using pip using a tool of your choice.
+
+```bash
+pip install git+https://github.com/larryhopecode/ollama-benchmark.git
+```
+
+#### Local Setup
+
 1. **Clone the repository**
 
    ```bash
@@ -78,8 +88,10 @@ Follow these instructions to set up and run benchmarks on your system.
 
 3. **Install dependencies**
 
+Install the package in editable mode, in case you want to modify the code.
+
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
    ```
 
 ## Usage
@@ -97,13 +109,13 @@ Follow these instructions to set up and run benchmarks on your system.
    Basic usage:
 
    ```bash
-   python benchmark.py
+   ollama-benchmark
    ```
 
    With options:
 
    ```bash
-   python benchmark.py --verbose --models deepseek-r1:70b --prompts "Write a hello world program" "Explain quantum computing"
+   ollama-benchmark --verbose --models deepseek-r1:70b --prompts "Write a hello world program" "Explain quantum computing"
    ```
 
 ### Command Line Options
