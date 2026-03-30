@@ -123,6 +123,7 @@ Install the package in editable mode, in case you want to modify the code.
 - `-v, --verbose`: Enable detailed output including streaming responses
 - `-m, --models`: Space-separated list of models to benchmark (defaults to all available models)
 - `-p, --prompts`: Space-separated list of custom prompts (defaults to a predefined set testing various capabilities)
+- `-t, --table_output`: Display results as a comparison table instead of separate per-model stats
 
 The default benchmark suite includes prompts testing:
 
