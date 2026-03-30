@@ -1,15 +1,26 @@
-# Ollama based LLM Benchmark
+# Ollama Benchmark
 
-This tool allows you to get the t/s (tokens per second) of Large Language Models (LLMs) running on your local machine. Currently we only support testing Ollama llms
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Ollama](https://img.shields.io/badge/Ollama-supported-blueviolet.svg)](https://ollama.com/)
 
-## Example output
+A lightweight benchmarking tool for measuring LLM inference performance through [Ollama](https://ollama.com/). Get detailed tokens-per-second metrics, load times, and generation speed for any model running on your local hardware.
 
-Output on a Nvidia 4090 windows desktop
+## Features
 
-```bash
-Average stats:
-(Running on dual 3090 Ti GPU, Epyc 7763 CPU in Ubuntu 22.04)
+- **Prompt processing speed** — measures tokens/sec for input evaluation
+- **Generation speed** — measures tokens/sec for output generation
+- **Model load time** — tracks cold-start overhead
+- **Multi-model comparison** — benchmark several models in a single run
+- **Table output** — side-by-side comparison across models with `-t`
+- **Custom prompts** — supply your own prompts or use the built-in test suite
+- **Zero dependencies on cloud** — everything runs locally through Ollama
 
+## Example Output
+
+**Dual 3090 Ti GPU, Epyc 7763 CPU — Ubuntu 22.04:**
+
+```
 ----------------------------------------------------
         Model: deepseek-r1:70b
         Performance Metrics:
@@ -25,10 +36,11 @@ Average stats:
             Generation Time:    434.70s
             Total Time:         441.31s
 ----------------------------------------------------
+```
 
-Average stats: 
-(Running on single 3090 GPU, 13900KS CPU in WSL2(Ubuntu 22.04) in Windows 11)
+**Single 3090 GPU, 13900KS CPU — WSL2 (Ubuntu 22.04) on Windows 11:**
 
+```
 ----------------------------------------------------
         Model: deepseek-r1:32b
         Performance Metrics:
@@ -48,84 +60,67 @@ Average stats:
 
 ## Getting Started
 
-Follow these instructions to set up and run benchmarks on your system.
-
 ### Prerequisites
 
 - Python 3.11 or higher
-- [Ollama](https://ollama.com/) installed and configured
+- [Ollama](https://ollama.com/) installed and running
 
 ### Installation
 
-#### Using pip
-
-Install the package directly using pip using a tool of your choice.
+**Using pip** (recommended):
 
 ```bash
-pip install git+https://github.com/larryhopecode/ollama-benchmark.git
+pip install git+https://github.com/LarHope/ollama-benchmark.git
 ```
 
-#### Local Setup
+**From source:**
 
-1. **Clone the repository**
-
-   ```bash
-   git clone https://github.com/larryhopecode/ollama-benchmark.git
-   cd ollama-benchmark
-   ```
-
-2. **Set up Python environment**
-
-   ```bash
-   # Linux/macOS
-   python3 -m venv venv
-   source venv/bin/activate
-
-   # Windows
-   python -m venv venv
-   .\venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-
-Install the package in editable mode, in case you want to modify the code.
-
-   ```bash
-   pip install -e .
-   ```
+```bash
+git clone https://github.com/LarHope/ollama-benchmark.git
+cd ollama-benchmark
+python3 -m venv venv && source venv/bin/activate  # or .\venv\Scripts\activate on Windows
+pip install -e .
+```
 
 ## Usage
 
-1. **Start Ollama Server**
+Make sure the Ollama server is running:
 
-   Ensure the Ollama service is running:
+```bash
+ollama serve
+```
 
-   ```bash
-   ollama serve
-   ```
+Run benchmarks:
 
-2. **Run Benchmarks**
+```bash
+# Benchmark all available models with default prompts
+ollama-benchmark
 
-   Basic usage:
+# Benchmark specific models
+ollama-benchmark --models deepseek-r1:70b llama3:8b
 
-   ```bash
-   ollama-benchmark
-   ```
+# Custom prompts
+ollama-benchmark --models mistral --prompts "Write a hello world in Rust" "Explain quantum computing"
 
-   With options:
+# Table comparison output
+ollama-benchmark --table_output --models deepseek-r1:70b deepseek-r1:32b llama3:8b
 
-   ```bash
-   ollama-benchmark --verbose --models deepseek-r1:70b --prompts "Write a hello world program" "Explain quantum computing"
-   ```
+# Verbose mode (shows streaming responses)
+ollama-benchmark --verbose --models deepseek-r1:70b
+```
 
-### Command Line Options
+### CLI Reference
 
-- `-v, --verbose`: Enable detailed output including streaming responses
-- `-m, --models`: Space-separated list of models to benchmark (defaults to all available models)
-- `-p, --prompts`: Space-separated list of custom prompts (defaults to a predefined set testing various capabilities)
-- `-t, --table_output`: Display results as a comparison table instead of separate per-model stats
+| Flag | Description |
+|------|-------------|
+| `-v, --verbose` | Show streaming responses and per-prompt stats |
+| `-m, --models` | Space-separated list of models to benchmark (default: all available) |
+| `-p, --prompts` | Space-separated list of custom prompts |
+| `-t, --table_output` | Display results as a comparison table |
 
-The default benchmark suite includes prompts testing:
+### Default Benchmark Suite
+
+When no custom prompts are provided, the tool runs a suite covering:
 
 - Analytical reasoning
 - Creative writing
@@ -133,10 +128,18 @@ The default benchmark suite includes prompts testing:
 - Technical knowledge
 - Structured output generation
 
+## How It Works
+
+1. Connects to your local Ollama instance
+2. Sends each prompt to each model
+3. Captures timing metrics from the Ollama API response (total duration, prompt eval, generation)
+4. Calculates tokens/sec for prompt processing, generation, and combined throughput
+5. Outputs per-model averages or a comparison table
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
