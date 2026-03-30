@@ -1,7 +1,7 @@
 [project]
 name = "ollama-benchmark"
 version = "0.1.0"
-description = "Add your description here"
+description = "Benchmark tool for measuring Ollama LLM performance metrics (tokens/sec, load time, eval speed)"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
