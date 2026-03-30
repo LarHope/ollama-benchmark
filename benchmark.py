@@ -174,19 +174,13 @@ def inference_stats(model_response: OllamaResponse) -> None:
         model_response: OllamaResponse containing benchmark metrics
     """
     # Calculate tokens per second for different phases
-    prompt_ts = model_response.prompt_eval_count / (
-        nanosec_to_sec(model_response.prompt_eval_duration)
-    )
-    response_ts = model_response.eval_count / (
-        nanosec_to_sec(model_response.eval_duration)
-    )
-    total_ts = (
-                       model_response.prompt_eval_count + model_response.eval_count
-               ) / (
-                   nanosec_to_sec(
-                       model_response.prompt_eval_duration + model_response.eval_duration
-                   )
-               )
+    prompt_eval_secs = nanosec_to_sec(model_response.prompt_eval_duration)
+    eval_secs = nanosec_to_sec(model_response.eval_duration)
+    total_secs = nanosec_to_sec(model_response.prompt_eval_duration + model_response.eval_duration)
+
+    prompt_ts = model_response.prompt_eval_count / prompt_eval_secs if prompt_eval_secs > 0 else 0.0
+    response_ts = model_response.eval_count / eval_secs if eval_secs > 0 else 0.0
+    total_ts = (model_response.prompt_eval_count + model_response.eval_count) / total_secs if total_secs > 0 else 0.0
 
     print(
         f"""
@@ -263,19 +257,13 @@ def table_stats(benchmarks: Dict[str, List[OllamaResponse]]) -> None:
         eval_duration = sum(r.eval_duration for r in responses)
 
         # Calculate tokens per second for different phases
-        prompt_ts = prompt_eval_count / (
-            nanosec_to_sec(prompt_eval_duration)
-        )
-        response_ts = eval_count / (
-            nanosec_to_sec(eval_duration)
-        )
-        total_ts = (
-                           prompt_eval_count + eval_count
-                   ) / (
-                       nanosec_to_sec(
-                           prompt_eval_duration + eval_duration
-                       )
-                   )
+        prompt_eval_secs = nanosec_to_sec(prompt_eval_duration)
+        eval_secs = nanosec_to_sec(eval_duration)
+        total_secs = nanosec_to_sec(prompt_eval_duration + eval_duration)
+
+        prompt_ts = prompt_eval_count / prompt_eval_secs if prompt_eval_secs > 0 else 0.0
+        response_ts = eval_count / eval_secs if eval_secs > 0 else 0.0
+        total_ts = (prompt_eval_count + eval_count) / total_secs if total_secs > 0 else 0.0
 
         # table.append([model_name, total_duration, load_duration, prompt_eval_duration, eval_count, eval_duration])
         table.append([model_name, prompt_ts, response_ts, total_ts,
