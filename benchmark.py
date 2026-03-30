@@ -286,7 +286,7 @@ def table_stats(benchmarks: Dict[str, List[OllamaResponse]]) -> None:
     print(tabulate(table, headers=["Model\nName", "Prompt\nEvaluation Rate\n(T/s)", "Evaluation\nRate\n(T/s)",
                                    "Total\nRate\n(T/s)", "Load Time\n(s)",
                                    "Prompt\nEvaluation Count", "Prompt\nEvaluation Time\n(s)",
-                                   "Evalutaion\nCount", "Evaluation\nTime\n(s)", "Total Time\n(s)"], tablefmt="orgtbl",
+                                   "Evaluation\nCount", "Evaluation\nTime\n(s)", "Total Time\n(s)"], tablefmt="orgtbl",
                    floatfmt=".2f"))
 
 
