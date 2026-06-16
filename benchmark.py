@@ -101,27 +101,19 @@ def run_benchmark(
                 messages=messages,
                 stream=True,
             )
+            final_chunk = None
             for chunk in stream:
                 if hasattr(chunk.message, 'content'):
                     content += chunk.message.content
                     print(chunk.message.content, end="", flush=True)
+                if getattr(chunk, 'done', False):
+                    final_chunk = chunk
 
             if not content.strip():
                 print(f"\nError: Ollama model {model_name} returned empty response. Please check if:")
                 print("1. The model is properly loaded")
                 print("2. The Ollama server is functioning correctly")
                 print("3. Try running 'ollama run {model_name}' in terminal to verify model output")
-                return None
-
-            # Make a non-streaming call to get the metrics
-            response = ollama.chat(
-                model=model_name,
-                messages=messages,
-            )
-
-            # Check if response has content
-            if not hasattr(response.message, 'content') or not response.message.content.strip():
-                print(f"\nError: Ollama model {model_name} returned empty response in non-streaming mode")
                 return None
 
             # Create response with collected content and metrics
@@ -132,12 +124,12 @@ def run_benchmark(
                     content=content
                 ),
                 done=True,
-                total_duration=getattr(response, 'total_duration', 0),
-                load_duration=getattr(response, 'load_duration', 0),
-                prompt_eval_count=getattr(response, 'prompt_eval_count', 0),
-                prompt_eval_duration=getattr(response, 'prompt_eval_duration', 0),
-                eval_count=getattr(response, 'eval_count', 0),
-                eval_duration=getattr(response, 'eval_duration', 0)
+                total_duration=getattr(final_chunk, 'total_duration', 0),
+                load_duration=getattr(final_chunk, 'load_duration', 0),
+                prompt_eval_count=getattr(final_chunk, 'prompt_eval_count', 0),
+                prompt_eval_duration=getattr(final_chunk, 'prompt_eval_duration', 0),
+                eval_count=getattr(final_chunk, 'eval_count', 0),
+                eval_duration=getattr(final_chunk, 'eval_duration', 0)
             )
         else:
             # For non-verbose mode, just make a single non-streaming call
