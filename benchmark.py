@@ -186,12 +186,12 @@ def inference_stats(model_response: OllamaResponse) -> None:
         f"""
 ----------------------------------------------------
         Model: {model_response.model}
-        Performance Metrics:
+        Performance Metrics (Average):
             Prompt Processing:  {prompt_ts:.2f} tokens/sec
             Generation Speed:   {response_ts:.2f} tokens/sec
             Combined Speed:     {total_ts:.2f} tokens/sec
 
-        Workload Stats:
+        Workload Stats (Total):
             Input Tokens:       {model_response.prompt_eval_count}
             Generated Tokens:   {model_response.eval_count}
             Model Load Time:    {nanosec_to_sec(model_response.load_duration):.2f}s
@@ -203,7 +203,7 @@ def inference_stats(model_response: OllamaResponse) -> None:
     )
 
 
-def average_stats(responses: List[OllamaResponse]) -> None:
+def print_stats(responses: List[OllamaResponse]) -> None:
     """
     Calculates and prints average statistics across multiple benchmark runs.
 
@@ -211,7 +211,7 @@ def average_stats(responses: List[OllamaResponse]) -> None:
         responses: List of OllamaResponse objects from multiple runs
     """
     if not responses:
-        print("No stats to average")
+        print("No stats to print")
         return
 
     # Calculate aggregate metrics
@@ -230,7 +230,6 @@ def average_stats(responses: List[OllamaResponse]) -> None:
         eval_count=sum(r.eval_count for r in responses),
         eval_duration=sum(r.eval_duration for r in responses),
     )
-    print("Average stats:")
     inference_stats(res)
 
 
@@ -393,7 +392,7 @@ def main() -> None:
     else:
         # Calculate and display average statistics
         for model_name, responses in benchmarks.items():
-            average_stats(responses)
+            print_stats(responses)
 
 
 if __name__ == "__main__":
