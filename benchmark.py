@@ -31,6 +31,11 @@ class Message(BaseModel):
     content: str
 
 
+def nanosec_to_sec(nanosec: int) -> float:
+    """Converts nanoseconds to seconds."""
+    return nanosec / 1_000_000_000
+
+
 class OllamaResponse(BaseModel):
     """
     Represents a structured response from the Ollama API.
@@ -40,21 +45,21 @@ class OllamaResponse(BaseModel):
     created_at: datetime | None = None
     message: Message
     done: bool
-    total_duration: int = Field(default=0)
-    load_duration: int = Field(default=0)
+    total_duration: float = Field(default=0.0)
+    load_duration: float = Field(default=0.0)
     prompt_eval_count: int = Field(default=0)
-    prompt_eval_duration: int = Field(default=0)
+    prompt_eval_duration: float = Field(default=0.0)
     eval_count: int = Field(default=0)
-    eval_duration: int = Field(default=0)
+    eval_duration: float = Field(default=0.0)
 
     @classmethod
     def from_chat_response(cls, response) -> 'OllamaResponse':
         """
         Converts an Ollama API response into an OllamaResponse instance.
-        
+
         Args:
             response: Raw response from Ollama API
-        
+
         Returns:
             OllamaResponse: Structured response object
         """
@@ -65,12 +70,44 @@ class OllamaResponse(BaseModel):
                 content=response.message.content
             ),
             done=response.done,
-            total_duration=getattr(response, 'total_duration', 0),
-            load_duration=getattr(response, 'load_duration', 0),
+            total_duration=nanosec_to_sec(getattr(response, 'total_duration', 0)),
+            load_duration=nanosec_to_sec(getattr(response, 'load_duration', 0)),
             prompt_eval_count=getattr(response, 'prompt_eval_count', 0),
-            prompt_eval_duration=getattr(response, 'prompt_eval_duration', 0),
+            prompt_eval_duration=nanosec_to_sec(getattr(response, 'prompt_eval_duration', 0)),
             eval_count=getattr(response, 'eval_count', 0),
-            eval_duration=getattr(response, 'eval_duration', 0)
+            eval_duration=nanosec_to_sec(getattr(response, 'eval_duration', 0))
+        )
+
+    @property
+    def prompt_eval_rate(self) -> float:
+        return self.prompt_eval_count / self.prompt_eval_duration if self.prompt_eval_duration > 0 else 0.0
+
+    @property
+    def eval_rate(self) -> float:
+        return self.eval_count / self.eval_duration if self.eval_duration > 0 else 0.0
+
+    @property
+    def total_rate(self) -> float:
+        total_secs = self.prompt_eval_duration + self.eval_duration
+        return (self.prompt_eval_count + self.eval_count) / total_secs if total_secs > 0 else 0.0
+
+    @classmethod
+    def aggregate(cls, responses: List['OllamaResponse']) -> 'OllamaResponse':
+        """Aggregates multiple responses into a single summary response."""
+        return cls(
+            model=responses[0].model,
+            created_at=datetime.now(),
+            message=Message(
+                role="system",
+                content=f"Aggregate stats across {len(responses)} runs",
+            ),
+            done=True,
+            total_duration=sum(r.total_duration for r in responses),
+            load_duration=sum(r.load_duration for r in responses),
+            prompt_eval_count=sum(r.prompt_eval_count for r in responses),
+            prompt_eval_duration=sum(r.prompt_eval_duration for r in responses),
+            eval_count=sum(r.eval_count for r in responses),
+            eval_duration=sum(r.eval_duration for r in responses),
         )
 
 
@@ -125,20 +162,7 @@ def run_benchmark(
                 return None
 
             # Create response with collected content and metrics
-            return OllamaResponse(
-                model=model_name,
-                message=Message(
-                    role="assistant",
-                    content=content
-                ),
-                done=True,
-                total_duration=getattr(response, 'total_duration', 0),
-                load_duration=getattr(response, 'load_duration', 0),
-                prompt_eval_count=getattr(response, 'prompt_eval_count', 0),
-                prompt_eval_duration=getattr(response, 'prompt_eval_duration', 0),
-                eval_count=getattr(response, 'eval_count', 0),
-                eval_duration=getattr(response, 'eval_duration', 0)
-            )
+            return OllamaResponse.from_chat_response(response)
         else:
             # For non-verbose mode, just make a single non-streaming call
             response = ollama.chat(
@@ -161,11 +185,6 @@ def run_benchmark(
         return None
 
 
-def nanosec_to_sec(nanosec: int) -> float:
-    """Converts nanoseconds to seconds."""
-    return nanosec / 1_000_000_000
-
-
 def inference_stats(model_response: OllamaResponse) -> None:
     """
     Calculates and prints detailed inference statistics for a model response.
@@ -173,31 +192,22 @@ def inference_stats(model_response: OllamaResponse) -> None:
     Args:
         model_response: OllamaResponse containing benchmark metrics
     """
-    # Calculate tokens per second for different phases
-    prompt_eval_secs = nanosec_to_sec(model_response.prompt_eval_duration)
-    eval_secs = nanosec_to_sec(model_response.eval_duration)
-    total_secs = nanosec_to_sec(model_response.prompt_eval_duration + model_response.eval_duration)
-
-    prompt_ts = model_response.prompt_eval_count / prompt_eval_secs if prompt_eval_secs > 0 else 0.0
-    response_ts = model_response.eval_count / eval_secs if eval_secs > 0 else 0.0
-    total_ts = (model_response.prompt_eval_count + model_response.eval_count) / total_secs if total_secs > 0 else 0.0
-
     print(
         f"""
 ----------------------------------------------------
         Model: {model_response.model}
         Performance Metrics:
-            Prompt Processing:  {prompt_ts:.2f} tokens/sec
-            Generation Speed:   {response_ts:.2f} tokens/sec
-            Combined Speed:     {total_ts:.2f} tokens/sec
+            Prompt Processing:  {model_response.prompt_eval_rate:.2f} tokens/sec
+            Generation Speed:   {model_response.eval_rate:.2f} tokens/sec
+            Combined Speed:     {model_response.total_rate:.2f} tokens/sec
 
         Workload Stats:
             Input Tokens:       {model_response.prompt_eval_count}
             Generated Tokens:   {model_response.eval_count}
-            Model Load Time:    {nanosec_to_sec(model_response.load_duration):.2f}s
-            Processing Time:    {nanosec_to_sec(model_response.prompt_eval_duration):.2f}s
-            Generation Time:    {nanosec_to_sec(model_response.eval_duration):.2f}s
-            Total Time:         {nanosec_to_sec(model_response.total_duration):.2f}s
+            Model Load Time:    {model_response.load_duration:.2f}s
+            Processing Time:    {model_response.prompt_eval_duration:.2f}s
+            Generation Time:    {model_response.eval_duration:.2f}s
+            Total Time:         {model_response.total_duration:.2f}s
 ----------------------------------------------------
         """
     )
@@ -215,21 +225,7 @@ def average_stats(responses: List[OllamaResponse]) -> None:
         return
 
     # Calculate aggregate metrics
-    res = OllamaResponse(
-        model=responses[0].model,
-        created_at=datetime.now(),
-        message=Message(
-            role="system",
-            content=f"Average stats across {len(responses)} runs",
-        ),
-        done=True,
-        total_duration=sum(r.total_duration for r in responses),
-        load_duration=sum(r.load_duration for r in responses),
-        prompt_eval_count=sum(r.prompt_eval_count for r in responses),
-        prompt_eval_duration=sum(r.prompt_eval_duration for r in responses),
-        eval_count=sum(r.eval_count for r in responses),
-        eval_duration=sum(r.eval_duration for r in responses),
-    )
+    res = OllamaResponse.aggregate(responses)
     print("Average stats:")
     inference_stats(res)
 
@@ -249,27 +245,20 @@ def table_stats(benchmarks: Dict[str, List[OllamaResponse]]) -> None:
     table: List[List] = []
     for model_name, responses in benchmarks.items():
         # Calculate aggregate metrics
-        total_duration = sum(r.total_duration for r in responses)
-        load_duration = sum(r.load_duration for r in responses)
-        prompt_eval_count = sum(r.prompt_eval_count for r in responses)
-        prompt_eval_duration = sum(r.prompt_eval_duration for r in responses)
-        eval_count = sum(r.eval_count for r in responses)
-        eval_duration = sum(r.eval_duration for r in responses)
+        res = OllamaResponse.aggregate(responses)
 
-        # Calculate tokens per second for different phases
-        prompt_eval_secs = nanosec_to_sec(prompt_eval_duration)
-        eval_secs = nanosec_to_sec(eval_duration)
-        total_secs = nanosec_to_sec(prompt_eval_duration + eval_duration)
-
-        prompt_ts = prompt_eval_count / prompt_eval_secs if prompt_eval_secs > 0 else 0.0
-        response_ts = eval_count / eval_secs if eval_secs > 0 else 0.0
-        total_ts = (prompt_eval_count + eval_count) / total_secs if total_secs > 0 else 0.0
-
-        # table.append([model_name, total_duration, load_duration, prompt_eval_duration, eval_count, eval_duration])
-        table.append([model_name, prompt_ts, response_ts, total_ts,
-                      nanosec_to_sec(load_duration),
-                      prompt_eval_count, nanosec_to_sec(prompt_eval_duration), eval_count,
-                      nanosec_to_sec(eval_duration), nanosec_to_sec(total_duration)])
+        table.append([
+            model_name,
+            res.prompt_eval_rate,
+            res.eval_rate,
+            res.total_rate,
+            res.load_duration,
+            res.prompt_eval_count,
+            res.prompt_eval_duration,
+            res.eval_count,
+            res.eval_duration,
+            res.total_duration
+        ])
 
     print(tabulate(table, headers=["Model\nName", "Prompt\nEvaluation Rate\n(T/s)", "Evaluation\nRate\n(T/s)",
                                    "Total\nRate\n(T/s)", "Load Time\n(s)",
@@ -345,15 +334,15 @@ def main() -> None:
 
             # Medium-length creative task
             "Write a detailed story about a time traveler who visits three different historical periods. Include specific details about each era and the protagonist's interactions.",
-
-            # Long complex analysis
-            "Analyze the potential impact of artificial intelligence on global employment over the next decade. Consider various industries, economic factors, and potential mitigation strategies. Provide specific examples and data-driven reasoning.",
-
-            # Technical task with specific requirements
-            "Write a Python function that implements a binary search tree with methods for insertion, deletion, and traversal. Include comments explaining the time complexity of each operation.",
-
-            # Structured output task
-            "Create a detailed business plan for a renewable energy startup. Include sections on market analysis, financial projections, competitive advantages, and risk assessment. Format the response with clear headings and bullet points.",
+            #
+            # # Long complex analysis
+            # "Analyze the potential impact of artificial intelligence on global employment over the next decade. Consider various industries, economic factors, and potential mitigation strategies. Provide specific examples and data-driven reasoning.",
+            #
+            # # Technical task with specific requirements
+            # "Write a Python function that implements a binary search tree with methods for insertion, deletion, and traversal. Include comments explaining the time complexity of each operation.",
+            #
+            # # Structured output task
+            # "Create a detailed business plan for a renewable energy startup. Include sections on market analysis, financial projections, competitive advantages, and risk assessment. Format the response with clear headings and bullet points.",
         ],
         help="Prompts to use for benchmarking. Multiple prompts can be specified. Default prompts test various capabilities including analysis, creativity, technical knowledge, and structured output.",
     )
