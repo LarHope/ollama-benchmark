@@ -51,10 +51,10 @@ class OllamaResponse(BaseModel):
     def from_chat_response(cls, response) -> 'OllamaResponse':
         """
         Converts an Ollama API response into an OllamaResponse instance.
-        
+
         Args:
             response: Raw response from Ollama API
-        
+
         Returns:
             OllamaResponse: Structured response object
         """
@@ -101,8 +101,18 @@ def run_benchmark(
                 messages=messages,
                 stream=True,
             )
+            is_thinking = False
             for chunk in stream:
-                if hasattr(chunk.message, 'content'):
+                if hasattr(chunk.message, 'thinking') and chunk.message.thinking:
+                    if not is_thinking:
+                        print("<think>")
+                        is_thinking = True
+                    content += chunk.message.thinking
+                    print(chunk.message.thinking, end="", flush=True)
+                if hasattr(chunk.message, 'content') and chunk.message.content:
+                    if is_thinking:
+                        print("</think>")
+                        is_thinking = False
                     content += chunk.message.content
                     print(chunk.message.content, end="", flush=True)
 
